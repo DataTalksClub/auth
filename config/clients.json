@@ -1,0 +1,38 @@
+{
+  "user_pool_id": "us-east-1_H7nJu52Bs",
+  "region": "us-east-1",
+  "auth_base_url": "https://auth.dtcdev.click",
+  "clients": [
+    {
+      "name": "dapier",
+      "client_id": "27nrp6tnvfudml89teggb9haur",
+      "callback_url": "https://dapier.dtcdev.click/auth/callback",
+      "logout_url": "https://dapier.dtcdev.click/"
+    },
+    {
+      "name": "dataops",
+      "client_id": "1kjv61esdjs3003s8u42sgr3hf",
+      "callback_url": "https://ops.dtcdev.click/auth/callback",
+      "logout_url": "https://ops.dtcdev.click/"
+    },
+    {
+      "name": "studio",
+      "client_id": "330liq66joe6gt93c437sou2rd",
+      "callback_url": "https://sds.dtcdev.click/auth/callback",
+      "logout_url": "https://sds.dtcdev.click/"
+    },
+    {
+      "name": "datamailer",
+      "client_id": "41gcnc18qjtq61rsag9iqoepmk",
+      "callback_url": "https://datamailer.dtcdev.click/auth/callback",
+      "logout_url": "https://datamailer.dtcdev.click/"
+    },
+    {
+      "name": "gym",
+      "client_id": "4dvcqg57g375cfhjr0ncb33fgn",
+      "callback_url": "https://gym.dtcdev.click/auth/callback",
+      "logout_url": "https://gym.dtcdev.click/"
+    }
+  ]
+}
+

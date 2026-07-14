@@ -1,0 +1,60 @@
+name: CI and deploy auth policy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shared-auth-policy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  STACK_NAME: dtcdev-shared-auth
+  DEPLOY_ROLE_ARN: arn:aws:iam::817685572750:role/shared-auth-github-actions-deploy
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --with pytest --with ruff ruff check .
+      - run: uv run --with pytest python -m pytest
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-session-name: shared-auth-policy
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Package policy Lambda
+        run: zip -j domain-guard.zip src/index.py
+      - name: Deploy policy Lambda
+        run: |
+          function_name=$(aws cloudformation describe-stack-resource \
+            --stack-name "$STACK_NAME" \
+            --logical-resource-id DomainGuardFunction \
+            --query StackResourceDetail.PhysicalResourceId \
+            --output text)
+          aws lambda update-function-code \
+            --function-name "$function_name" \
+            --zip-file fileb://domain-guard.zip >/dev/null
+          aws lambda wait function-updated --function-name "$function_name"
+      - name: Verify live deployment
+        run: uv run --with boto3 python scripts/verify_deployment.py --live
+

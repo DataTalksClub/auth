@@ -1,11 +1,58 @@
-# Shared DTC Development Authentication
+# DataTalksClub shared authentication
 
-The deployable authentication infrastructure is maintained with the rest of the
-AWS sandbox infrastructure:
+Application-level policy and deployment verification for the shared Cognito
+browser login at `https://auth.dtcdev.click`.
 
-- [`../aws-infra/sandbox/auth/template.yaml`](../aws-infra/sandbox/auth/template.yaml)
-- [`../aws-infra/sandbox/auth/README.md`](../aws-infra/sandbox/auth/README.md)
+This repository owns:
 
-It provides Cognito password login and optional Google Workspace login at
-`auth.dtcdev.click`, with a separate OAuth client for every protected service.
+- the federated-domain guard Lambda code;
+- the public client/callback contract for protected services;
+- unit and contract tests;
+- live post-deployment verification;
+- CI/CD for deploying the policy code through GitHub Actions OIDC.
+
+AWS resources remain declarative in
+[`DataTalksClub/aws-infra`](https://github.com/DataTalksClub/aws-infra/tree/main/sandbox/auth):
+the Cognito pool and clients, custom domain, certificate, DNS, Lambda resource,
+and GitHub/CloudFormation IAM roles.
+
+## Policy
+
+- Administrator-created Cognito username/password users are allowed.
+- Google identities must have a verified `@datatalks.club` email address.
+- The restriction is enforced on both first federated signup and every later
+  Google authentication. A Google `hd` hint is not an authorization boundary.
+- Other Cognito trigger types pass through unchanged.
+
+Each relying service performs authorization-code + S256 PKCE, validates the ID
+token and nonce, and creates its own secure server-side session.
+
+## Development
+
+```bash
+uv run --with pytest python -m pytest
+uv run --with boto3 python scripts/verify_deployment.py --live
+```
+
+The live verifier checks the deployed Cognito clients, direct Google redirects,
+both allow/deny branches of the Lambda policy, and absence of disposable test
+users. It does not sign in to a real Google account.
+
+## Deployment
+
+Pushes to `main` run tests and deploy `src/index.py` to the existing
+`DomainGuardFunction` in the `dtcdev-shared-auth` stack. GitHub authenticates to
+AWS with OIDC; no long-lived AWS key or Google OAuth secret is stored here.
+
+Infrastructure changes continue through the `aws-infra` shared-auth workflow.
+That workflow also reapplies the latest policy code from this repository after
+CloudFormation completes, preventing the inline bootstrap implementation from
+replacing the maintained runtime code.
+
+Google OAuth credential rotation is performed in Google Cloud and the encrypted
+`SHARED_AUTH_GOOGLE_CLIENT_ID` / `SHARED_AUTH_GOOGLE_CLIENT_SECRET` repository
+secrets in `DataTalksClub/aws-infra`.
+
+See [Google authentication setup](docs/google-auth-setup.md) for the complete
+initial setup, rotation, deployment, and verification procedure.
 
