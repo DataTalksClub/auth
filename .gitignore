@@ -3,3 +3,6 @@ __pycache__/
 .ruff_cache/
 .venv/
 *.zip
+.env
+.env.*
+!.env.example
