@@ -49,10 +49,9 @@ That workflow also reapplies the latest policy code from this repository after
 CloudFormation completes, preventing the inline bootstrap implementation from
 replacing the maintained runtime code.
 
-Google OAuth credential rotation is performed in Google Cloud and the encrypted
-`SHARED_AUTH_GOOGLE_CLIENT_ID` / `SHARED_AUTH_GOOGLE_CLIENT_SECRET` repository
-secrets in `DataTalksClub/aws-infra`.
+Google OAuth credential rotation is performed in Google Cloud and AWS Secrets
+Manager. GitHub stores neither the client ID nor the client secret; the
+CloudFormation service role resolves them entirely within AWS.
 
 See [Google authentication setup](docs/google-auth-setup.md) for the complete
 initial setup, rotation, deployment, and verification procedure.
-

@@ -12,7 +12,7 @@ You need:
 
 - permission to manage a Google Cloud project associated with the
   `datatalks.club` Google Workspace organization;
-- permission to update Actions secrets in `DataTalksClub/aws-infra`;
+- permission to update `dtcdev-shared-auth/google-oauth` in AWS Secrets Manager;
 - permission to run that repository's shared-auth deployment workflow;
 - access to one `@datatalks.club` Google account for the allowed test and one
   non-domain Google account for the rejection test.
@@ -61,23 +61,22 @@ The client ID is not confidential; the client secret is.
 
 ## 3. Store the credentials for deployment
 
-Store both values as encrypted GitHub Actions secrets in
-`DataTalksClub/aws-infra`:
+Open AWS Secrets Manager in `us-east-1` and create a secret named:
 
-- `SHARED_AUTH_GOOGLE_CLIENT_ID`
-- `SHARED_AUTH_GOOGLE_CLIENT_SECRET`
-
-Use **Repository settings → Secrets and variables → Actions → New repository
-secret**, or run these commands in an interactive terminal from a trusted
-machine:
-
-```bash
-gh secret set SHARED_AUTH_GOOGLE_CLIENT_ID --repo DataTalksClub/aws-infra
-gh secret set SHARED_AUTH_GOOGLE_CLIENT_SECRET --repo DataTalksClub/aws-infra
+```text
+dtcdev-shared-auth/google-oauth
 ```
 
-Each command reads the value without putting it in source control. Do not add
-the values to `.env`, CloudFormation parameter files, or this repository.
+Choose **Other type of secret** and store two key/value pairs:
+
+| Key | Value |
+|---|---|
+| `client_id` | The Google OAuth client ID |
+| `client_secret` | The matching Google OAuth client secret |
+
+GitHub stores neither value. The GitHub deployment role can inspect only the
+secret's version metadata; the CloudFormation service role resolves the actual
+values within AWS and supplies them directly to Cognito.
 
 ## 4. Deploy the Cognito provider
 
@@ -88,8 +87,9 @@ gh workflow run deploy-shared-auth.yml --repo DataTalksClub/aws-infra
 ```
 
 The workflow uses GitHub OIDC to assume the least-privilege AWS deployment
-role, passes the two secrets as `NoEcho` CloudFormation parameters, updates the
+role, reads the current non-secret version ID, updates the
 `dtcdev-shared-auth` stack in `us-east-1`, and verifies the Google provider.
+Only CloudFormation's AWS service role can read the credential value.
 
 After it succeeds, this repository's **CI and deploy auth policy** workflow
 deploys and verifies the domain-guard Lambda independently. It does not need or
@@ -138,14 +138,13 @@ to recover or reuse a value that may have been exposed.
 Use this order to avoid unnecessary downtime:
 
 1. Create the replacement Google OAuth client.
-2. Update both `SHARED_AUTH_GOOGLE_CLIENT_*` GitHub secrets.
-3. run the `aws-infra` shared-auth deployment workflow;
-4. complete an allowed Google sign-in;
+2. Create a new version of `dtcdev-shared-auth/google-oauth` in AWS Secrets
+   Manager with the replacement `client_id` and `client_secret` values.
+3. Run the `aws-infra` shared-auth deployment workflow; it passes the new
+   version ID so Cognito refreshes both values.
+4. Complete an allowed Google sign-in.
 5. delete the old OAuth client in Google Cloud;
 6. rerun the automated verifier and the non-domain rejection test.
-
-The currently deployed Google client secret must be rotated because it appeared
-in an AWS diagnostic response during setup verification.
 
 ## Troubleshooting
 
