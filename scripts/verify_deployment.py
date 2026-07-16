@@ -32,11 +32,14 @@ def invoke(lambda_client, function_name, payload):
     return response.get("FunctionError"), body
 
 
-def guard_event(email):
+def guard_event(email, email_verified="true"):
+    attributes = {"email": email}
+    if email_verified is not None:
+        attributes["email_verified"] = email_verified
     return {
         "triggerSource": "PreAuthentication_Authentication",
         "userName": "Google_verifier",
-        "request": {"userAttributes": {"email": email, "email_verified": "true"}},
+        "request": {"userAttributes": attributes},
         "response": {},
     }
 
@@ -86,6 +89,16 @@ def verify_live():
         assert urllib.parse.urlsplit(response.headers["Location"]).hostname == "accounts.google.com"
         print(f"{client['name']}: client and Google redirect OK")
 
+    # The guard reads these claims from the trigger event, so Cognito must map
+    # them off the Google identity. An unmapped claim arrives as absent and the
+    # guard rejects every Google sign-in, including allowed ones.
+    mapping = cognito.describe_identity_provider(UserPoolId=pool, ProviderName="Google")[
+        "IdentityProvider"
+    ]["AttributeMapping"]
+    for claim in ("email", "email_verified"):
+        assert mapping.get(claim) == claim, f"Google provider does not map {claim}"
+    print("Google attribute mapping OK")
+
     resource = cloudformation.describe_stack_resource(
         StackName="dtcdev-shared-auth", LogicalResourceId="DomainGuardFunction"
     )["StackResourceDetail"]
@@ -93,6 +106,10 @@ def verify_live():
     error, _ = invoke(lambda_client, function_name, guard_event("verifier@datatalks.club"))
     assert error is None
     error, body = invoke(lambda_client, function_name, guard_event("verifier@example.com"))
+    assert error == "Unhandled" and "Workspace domain" in body["errorMessage"]
+    error, body = invoke(
+        lambda_client, function_name, guard_event("verifier@datatalks.club", email_verified=None)
+    )
     assert error == "Unhandled" and "Workspace domain" in body["errorMessage"]
 
     users = cognito.list_users(UserPoolId=pool)["Users"]
