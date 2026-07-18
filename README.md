@@ -18,7 +18,8 @@ and GitHub/CloudFormation IAM roles.
 
 ## Policy
 
-- Administrator-created Cognito username/password users are allowed.
+- Google is the only supported identity provider. Every app client offers
+  Google sign-in only; username/password authentication is not reachable.
 - Google identities must have a verified `@datatalks.club` email address.
 - The restriction is enforced on both first federated signup and every later
   Google authentication. A Google `hd` hint is not an authorization boundary.

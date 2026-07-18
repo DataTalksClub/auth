@@ -56,7 +56,7 @@ def verify_live():
         deployed = cognito.describe_user_pool_client(
             UserPoolId=pool, ClientId=client["client_id"]
         )["UserPoolClient"]
-        assert set(deployed["SupportedIdentityProviders"]) == {"COGNITO", "Google"}
+        assert set(deployed["SupportedIdentityProviders"]) == {"Google"}
         assert client["callback_url"] in deployed["CallbackURLs"]
         assert client["logout_url"] in deployed["LogoutURLs"]
 

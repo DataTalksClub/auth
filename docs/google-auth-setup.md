@@ -103,10 +103,12 @@ The automated verifier requires AWS access but no user credentials:
 uv run --with boto3 python scripts/verify_deployment.py --live
 ```
 
-It checks that all five Cognito application clients enable `COGNITO` and
-`Google`, their callback/logout registrations match `config/clients.json`, each
-Google authorization request reaches `accounts.google.com`, the deployed guard
-allows a verified `@datatalks.club` address and rejects another domain, and no
+It checks that all five Cognito application clients enable `Google` as their
+only identity provider, their callback/logout registrations match
+`config/clients.json`, the Google provider maps the `email` and `email_verified`
+claims the guard reads, each Google authorization request reaches
+`accounts.google.com`, the deployed guard allows a verified `@datatalks.club`
+address and rejects both another domain and a missing `email_verified`, and no
 disposable Codex test users remain.
 
 Then use private browser windows for the two human checks:
