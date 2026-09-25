@@ -13,6 +13,7 @@ def test_client_registry_is_complete_and_unique():
         "studio",
         "datamailer",
         "gym",
+        "dapier-cli",
     }
     assert len({client["client_id"] for client in clients}) == len(clients)
     assert len({client["callback_url"] for client in clients}) == len(clients)
@@ -22,8 +23,16 @@ def test_client_urls_are_https_and_callbacks_are_clean():
     for client in CONFIG["clients"]:
         callback = urlsplit(client["callback_url"])
         logout = urlsplit(client["logout_url"])
-        assert callback.scheme == logout.scheme == "https"
-        assert callback.path == "/auth/callback"
-        assert not callback.query and not callback.fragment
-        assert logout.hostname == callback.hostname
-
+        if callback.hostname == "localhost":
+            # Native CLI client: Cognito permits cleartext loopback redirects
+            # only as http://localhost on an explicit fixed port.
+            assert callback.scheme == logout.scheme == "http"
+            assert callback.port and logout.port == callback.port
+            assert logout.hostname == "localhost"
+            assert callback.path == "/callback"
+            assert not callback.query and not callback.fragment
+        else:
+            assert callback.scheme == logout.scheme == "https"
+            assert callback.path == "/auth/callback"
+            assert not callback.query and not callback.fragment
+            assert logout.hostname == callback.hostname
