@@ -32,6 +32,12 @@
       "client_id": "4dvcqg57g375cfhjr0ncb33fgn",
       "callback_url": "https://gym.dtcdev.click/auth/callback",
       "logout_url": "https://gym.dtcdev.click/"
+    },
+    {
+      "name": "dapier-cli",
+      "client_id": "5im1c5sp00c9otggr4c8imm23k",
+      "callback_url": "http://localhost:8471/callback",
+      "logout_url": "http://localhost:8471/"
     }
   ]
 }
