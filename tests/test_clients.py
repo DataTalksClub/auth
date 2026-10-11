@@ -14,6 +14,7 @@ def test_client_registry_is_complete_and_unique():
         "datamailer",
         "gym",
         "dapier-cli",
+        "agent-hub",
     }
     assert len({client["client_id"] for client in clients}) == len(clients)
     assert len({client["callback_url"] for client in clients}) == len(clients)

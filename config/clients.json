@@ -38,6 +38,12 @@
       "client_id": "5im1c5sp00c9otggr4c8imm23k",
       "callback_url": "http://localhost:8471/callback",
       "logout_url": "http://localhost:8471/"
+    },
+    {
+      "name": "agent-hub",
+      "client_id": "1tplqm9l6q6545mrk0gjv6eaeh",
+      "callback_url": "https://agent-hub.cloudflare-ai-agent-de9ca0.workers.dev/auth/callback",
+      "logout_url": "https://agent-hub.cloudflare-ai-agent-de9ca0.workers.dev/"
     }
   ]
 }
