@@ -11,7 +11,7 @@ def test_client_registry_is_complete_and_unique():
         "dapier",
         "dataops",
         "studio",
-        "datamailer",
+        "relay",
         "gym",
         "dapier-cli",
         "agent-hub",

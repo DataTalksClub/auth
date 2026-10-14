@@ -22,10 +22,10 @@
       "logout_url": "https://sds.dtcdev.click/"
     },
     {
-      "name": "datamailer",
+      "name": "relay",
       "client_id": "41gcnc18qjtq61rsag9iqoepmk",
-      "callback_url": "https://datamailer.dtcdev.click/auth/callback",
-      "logout_url": "https://datamailer.dtcdev.click/"
+      "callback_url": "https://relay.dtcdev.click/auth/callback",
+      "logout_url": "https://relay.dtcdev.click/"
     },
     {
       "name": "gym",

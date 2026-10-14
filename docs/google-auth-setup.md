@@ -2,7 +2,7 @@
 
 This guide connects one Google OAuth web client to the shared Cognito user pool
 at `auth.dtcdev.click`. Cognito then serves Google login to Dapier, DataOps,
-System Design Studio, AI Engineering Gym, and Datamailer. Do not create a
+System Design Studio, AI Engineering Gym, and Relay. Do not create a
 separate Google OAuth client for each service: Google returns to Cognito first,
 and Cognito returns to the selected service client afterward.
 
@@ -126,7 +126,7 @@ client and callback:
 - `https://ops.dtcdev.click/login`
 - `https://sds.dtcdev.click/login`
 - `https://gym.dtcdev.click/login`
-- `https://datamailer.dtcdev.click/admin/login/`
+- `https://relay.dtcdev.click/auth/login`
 
 Do not record passwords, authorization codes, cookies, ID tokens, or the OAuth
 client secret in screenshots or issue comments.
