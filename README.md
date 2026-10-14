@@ -28,6 +28,15 @@ and GitHub/CloudFormation IAM roles.
 Each relying service performs authorization-code + S256 PKCE, validates the ID
 token and nonce, and creates its own secure server-side session.
 
+CLI device login for those services is `dtc_device_login` (Python) and
+`dtc_device_login/login.mjs` (Node). Cognito does not issue an RFC 8628 device
+grant, so each app still approves the code in its own signed-in browser session
+and mints its own credential. The start, prompt, and poll loop lives here, and
+every app uses it. The default routes are `POST /api/auth/device` and
+`POST /api/auth/device/token`. Poll errors are `authorization_pending`,
+`slow_down`, `access_denied`, and `expired_token`. A 200 response with no
+`error` is that app's credential, which the caller stores.
+
 ## Development
 
 ```bash

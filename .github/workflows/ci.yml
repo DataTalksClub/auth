@@ -26,6 +26,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv run --with pytest --with ruff ruff check .
       - run: uv run --with pytest python -m pytest
+      - run: node --test tests/test_device_login.mjs
 
   deploy:
     if: github.event_name != 'pull_request'
