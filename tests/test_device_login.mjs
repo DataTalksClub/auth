@@ -30,7 +30,7 @@ test("deviceLogin polls until the credential arrives", async () => {
       body: {
         device_code: "secret",
         user_code: "ABCD-EFGH",
-        verification_uri_complete: "https://portal.test/device?user_code=ABCD-EFGH",
+        verification_uri_complete: "https://portal.test/device?code=ABCD-EFGH",
         expires_in: 600,
         interval: 1,
       },

@@ -102,7 +102,7 @@ def test_custom_paths_and_rewritten_link():
         (200, {
             "device_code": "secret",
             "user_code": "ABCD-EFGH",
-            "verification_uri_complete": "https://lambda.example/device?user_code=ABCD-EFGH",
+            "verification_uri_complete": "https://lambda.example/device?code=ABCD-EFGH",
             "expires_in": 30,
             "interval": 1,
         }),
