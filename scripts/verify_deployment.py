@@ -32,12 +32,12 @@ def invoke(lambda_client, function_name, payload):
     return response.get("FunctionError"), body
 
 
-def guard_event(email, email_verified="true"):
+def guard_event(email, email_verified="true", trigger="PreAuthentication_Authentication"):
     attributes = {"email": email}
     if email_verified is not None:
         attributes["email_verified"] = email_verified
     return {
-        "triggerSource": "PreAuthentication_Authentication",
+        "triggerSource": trigger,
         "userName": "Google_verifier",
         "request": {"userAttributes": attributes},
         "response": {},
@@ -45,6 +45,8 @@ def guard_event(email, email_verified="true"):
 
 
 def verify_live():
+    # Fail closed before inspecting or mutating any resource outside the sandbox.
+    assert boto3.client("sts").get_caller_identity()["Account"] == "817685572750"
     region = CONFIG["region"]
     pool = CONFIG["user_pool_id"]
     cognito = boto3.client("cognito-idp", region_name=region)
@@ -103,14 +105,23 @@ def verify_live():
         StackName="dtcdev-shared-auth", LogicalResourceId="DomainGuardFunction"
     )["StackResourceDetail"]
     function_name = resource["PhysicalResourceId"]
-    error, _ = invoke(lambda_client, function_name, guard_event("verifier@datatalks.club"))
-    assert error is None
-    error, body = invoke(lambda_client, function_name, guard_event("verifier@example.com"))
-    assert error == "Unhandled" and "Workspace domain" in body["errorMessage"]
-    error, body = invoke(
-        lambda_client, function_name, guard_event("verifier@datatalks.club", email_verified=None)
-    )
-    assert error == "Unhandled" and "Workspace domain" in body["errorMessage"]
+    for trigger in ("PreSignUp_ExternalProvider", "PreAuthentication_Authentication"):
+        error, body = invoke(
+            lambda_client, function_name, guard_event("verifier@datatalks.club", trigger=trigger)
+        )
+        assert error is None, f"{trigger}: verified Workspace account rejected"
+        if trigger == "PreSignUp_ExternalProvider":
+            assert body["response"] == {"autoConfirmUser": True, "autoVerifyEmail": True}
+        for email, verified in (
+            ("verifier@example.com", "true"),
+            ("verifier@datatalks.club", None),
+            ("verifier@datatalks.club", "false"),
+        ):
+            error, body = invoke(
+                lambda_client, function_name, guard_event(email, verified, trigger)
+            )
+            assert error == "Unhandled" and "Workspace domain" in body["errorMessage"]
+        print(f"{trigger}: Workspace allowed; other domain/missing/false verification denied")
 
     users = cognito.list_users(UserPoolId=pool)["Users"]
     assert not [user for user in users if "codex-" in user["Username"]]
