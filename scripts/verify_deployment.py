@@ -15,7 +15,9 @@ from pathlib import Path
 
 import boto3
 
-ROOT = Path(__file__).parents[1]
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 CONFIG = json.loads((ROOT / "config" / "clients.json").read_text())
 
 
