@@ -1961,7 +1961,9 @@ class OAuthServer:
             return self._json_response(200, self.discovery_metadata())
 
         if path.startswith("/.well-known/oauth-protected-resource") and method in {"GET", "HEAD"}:
-            return self._json_response(200, self.protected_resource_metadata(RESOURCE_HUB_MCP))
+            suffix = path[len("/.well-known/oauth-protected-resource") :]
+            prm_res = f"{self.issuer_url}{suffix}" if suffix else f"{self.issuer_url}/mcp"
+            return self._json_response(200, self.protected_resource_metadata(prm_res))
 
         if path in {"/.well-known/jwks.json", "/oauth/jwks.json"} and method in {"GET", "HEAD"}:
             return self._json_response(200, self.jwks_document())
