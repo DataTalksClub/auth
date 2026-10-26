@@ -2,6 +2,17 @@
   "user_pool_id": "us-east-1_H7nJu52Bs",
   "region": "us-east-1",
   "auth_base_url": "https://auth.dtcdev.click",
+  "oauth_issuer_url": "https://oauth.dtcdev.click",
+  "public_client_id": "dtc-mcp-public",
+  "cli_client_id": "dtc-cli",
+  "registered_resources": [
+    "https://hub.dtcdev.click/mcp",
+    "https://hub.dtcdev.click",
+    "https://frzdkakcapcyf6ywflhieyimgu0vtclr.lambda-url.eu-west-1.on.aws/mcp",
+    "https://mcp.ops.dtcdev.click/mcp",
+    "https://ops.dtcdev.click/mcp",
+    "https://ops.dtcdev.click"
+  ],
   "clients": [
     {
       "name": "dapier",

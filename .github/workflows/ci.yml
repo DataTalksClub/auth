@@ -44,7 +44,9 @@ jobs:
           role-session-name: shared-auth-policy
           aws-region: ${{ env.AWS_REGION }}
       - name: Package policy Lambda
-        run: zip -j domain-guard.zip src/index.py
+        run: |
+          zip -j domain-guard.zip src/index.py
+          zip -j mcp-oauth.zip src/oauth_server.py src/index.py
       - name: Deploy policy Lambda
         run: |
           function_name=$(aws cloudformation describe-stack-resource \
@@ -56,6 +58,17 @@ jobs:
             --function-name "$function_name" \
             --zip-file fileb://domain-guard.zip >/dev/null
           aws lambda wait function-updated --function-name "$function_name"
+          oauth_fn=$(aws cloudformation describe-stack-resources \
+            --stack-name "$STACK_NAME" \
+            --query "StackResources[?LogicalResourceId=='McpOAuthFunction'].PhysicalResourceId | [0]" \
+            --output text)
+          if [ -n "$oauth_fn" ] && [ "$oauth_fn" != "None" ]; then
+            aws lambda update-function-code \
+              --function-name "$oauth_fn" \
+              --zip-file fileb://mcp-oauth.zip >/dev/null
+            aws lambda wait function-updated --function-name "$oauth_fn"
+            uv run --with boto3 python scripts/provision_service_clients.py --region "$AWS_REGION"
+          fi
       - name: Verify live deployment
         run: uv run --with boto3 python scripts/verify_deployment.py --live
 

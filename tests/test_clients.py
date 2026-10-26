@@ -58,7 +58,7 @@ def test_client_urls_are_https_and_callbacks_are_clean():
         callbacks = _callback_urls(client)
         logouts = _logout_urls(client)
         assert len(callbacks) == len(logouts)
-        for callback_url, logout_url in zip(callbacks, logouts):
+        for callback_url, logout_url in zip(callbacks, logouts, strict=True):
             callback = _check_pair(callback_url, logout_url)
             if callback.hostname != "localhost":
                 assert callback.path == "/auth/callback"
