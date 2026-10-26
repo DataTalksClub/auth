@@ -59,8 +59,13 @@ def verify_live():
             UserPoolId=pool, ClientId=client["client_id"]
         )["UserPoolClient"]
         assert set(deployed["SupportedIdentityProviders"]) == {"Google"}
-        assert client["callback_url"] in deployed["CallbackURLs"]
-        assert client["logout_url"] in deployed["LogoutURLs"]
+        callbacks = client.get("callback_urls", [client.get("callback_url")])
+        logouts = client.get("logout_urls", [client.get("logout_url")])
+        assert len(callbacks) == len(logouts)
+        for callback_url in callbacks:
+            assert callback_url in deployed["CallbackURLs"]
+        for logout_url in logouts:
+            assert logout_url in deployed["LogoutURLs"]
 
         verifier = secrets.token_urlsafe(48)
         challenge = (
@@ -72,7 +77,7 @@ def verify_live():
             {
                 "response_type": "code",
                 "client_id": client["client_id"],
-                "redirect_uri": client["callback_url"],
+                "redirect_uri": callbacks[0],
                 "scope": "openid email profile",
                 "state": secrets.token_urlsafe(24),
                 "nonce": secrets.token_urlsafe(24),

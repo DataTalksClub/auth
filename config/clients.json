@@ -42,8 +42,16 @@
     {
       "name": "agent-hub",
       "client_id": "1tplqm9l6q6545mrk0gjv6eaeh",
-      "callback_url": "https://agent-hub.cloudflare-ai-agent-de9ca0.workers.dev/auth/callback",
-      "logout_url": "https://agent-hub.cloudflare-ai-agent-de9ca0.workers.dev/"
+      "callback_urls": [
+        "https://agent-hub.cloudflare-ai-agent-de9ca0.workers.dev/auth/callback",
+        "http://localhost:19130/auth/callback",
+        "https://hub.dtcdev.click/auth/callback"
+      ],
+      "logout_urls": [
+        "https://agent-hub.cloudflare-ai-agent-de9ca0.workers.dev/",
+        "http://localhost:19130/",
+        "https://hub.dtcdev.click/"
+      ]
     }
   ]
 }
