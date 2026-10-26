@@ -409,6 +409,7 @@ def matches_registered_redirect_uri(requested_uri: str, registered_uris: list[st
                 cand.scheme.lower() == "http"
                 and (cand.hostname or "").lower() == (req.hostname or "").lower()
                 and (cand.path or "/") == (req.path or "/")
+                and cand.query == req.query
             ):
                 return True
     return False
@@ -787,7 +788,7 @@ class OAuthServer:
                 isinstance(g, str) for g in requested_grants
             ):
                 return 400, {"error": "invalid_client_metadata"}
-            if "client_credentials" in requested_grants and len(requested_grants) == 1:
+            if "client_credentials" in requested_grants:
                 return 400, {
                     "error": "invalid_client_metadata",
                     "error_description": "client_credentials clients cannot be registered via DCR",
@@ -1396,7 +1397,8 @@ class OAuthServer:
             return 401, {"error": "invalid_client"}
 
         redirect_uri = str(params.get("redirect_uri") or "").strip()
-        if redirect_uri and redirect_uri != code_row["redirect_uri"]:
+        expected_redirect = str(code_row.get("redirect_uri") or "").strip()
+        if expected_redirect and redirect_uri != expected_redirect:
             return 400, {"error": "invalid_grant", "error_description": "redirect_uri mismatch"}
 
         if pkce_s256_challenge(code_verifier) != code_row["code_challenge"]:
@@ -1611,8 +1613,13 @@ class OAuthServer:
                     )
         elif token.count(".") == 2:
             try:
-                parts = token.split(".")
-                claims = json.loads(b64url_decode(parts[1]).decode("utf-8"))
+                claims = verify_access_token(
+                    token,
+                    expected_issuer=self.issuer_url,
+                    expected_audience=CANONICAL_RESOURCES,
+                    jwks=self.jwks_document(),
+                    now=self.now(),
+                )
                 jti = claims.get("jti")
                 exp = int(claims.get("exp") or (self.now() + HUMAN_ACCESS_TOKEN_TTL_SECONDS))
                 if jti:
@@ -1814,6 +1821,10 @@ class OAuthServer:
         device_row = self.store.get(dev_pk)
         if not device_row:
             return 400, {"error": "invalid_grant"}
+
+        stored_client = str(device_row.get("client_id") or "")
+        if client_id and stored_client and client_id != stored_client:
+            return 400, {"error": "invalid_grant", "error_description": "client_id mismatch"}
 
         now = self.now()
         if now >= int(device_row.get("expires_at") or 0):

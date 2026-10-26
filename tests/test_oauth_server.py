@@ -13,10 +13,12 @@ from scripts.provision_service_clients import SERVICE_CLIENT_CATALOG, build_upda
 from src.oauth_server import (
     CANONICAL_RESOURCES,
     CONSENT_CSP,
+    DEFAULT_HUMAN_SCOPE,
     DEVICE_GRANT_TYPE,
     RESOURCE_DATAOPS_API,
     RESOURCE_DATAOPS_MCP_CUSTOM,
     RESOURCE_DATAOPS_MCP_LAMBDA,
+    RESOURCE_DATAOPS_MCP_PORTAL,
     RESOURCE_HUB_API,
     RESOURCE_HUB_MCP,
     SESSION_COOKIE_NAME,
@@ -24,6 +26,7 @@ from src.oauth_server import (
     LocalRs256Signer,
     OAuthServer,
     b64url_decode,
+    b64url_encode,
     is_valid_redirect_uri,
     normalize_resource,
     parse_spki_rsa_public_key,
@@ -629,6 +632,7 @@ def test_conformance_codex_and_cross_audience_isolation(env_setup):
         RESOURCE_HUB_API,
         RESOURCE_DATAOPS_MCP_LAMBDA,
         RESOURCE_DATAOPS_MCP_CUSTOM,
+        RESOURCE_DATAOPS_MCP_PORTAL,
         RESOURCE_DATAOPS_API,
     ]
     minted_tokens: dict[str, str] = {}
@@ -1027,3 +1031,239 @@ def test_spki_parser_and_service_client_provisioning_helper():
         assert second_map[cid]["client_secret"] == first_map[cid]["client_secret"]
         assert normalize_resource(second_map[cid]["audience"]) in CANONICAL_RESOURCES
         assert len(b64url_decode("dGVzdA")) == 4
+
+
+def test_review_findings_hardening_and_edge_cases(env_setup):
+    """Cover reviewer findings 1-13 (PKCE plain, defaults, deny, reuse, revoke, device edges)."""
+    server = env_setup["server"]
+    clock = env_setup["clock"]
+    store = env_setup["store"]
+
+    # Finding 1: code_challenge_method=plain is explicitly rejected with 400
+    plain_pkce = server.dispatch(
+        _make_event(
+            "GET",
+            "/oauth/authorize",
+            query={
+                "client_id": "dtc-mcp-public",
+                "redirect_uri": "http://localhost:8080/cb",
+                "response_type": "code",
+                "code_challenge": "plain-challenge-0123456789abcdef0123456789abcdef",
+                "code_challenge_method": "plain",
+            },
+        )
+    )
+    assert plain_pkce["statusCode"] == 400
+
+    # Finding 2: Missing resource & scope default to RESOURCE_HUB_MCP and DEFAULT_HUMAN_SCOPE
+    v_def = "default-resource-scope-verifier-0123456789abcdef0123456789ab"
+    c_def = _complete_login_and_consent(
+        server,
+        {
+            "client_id": "dtc-mcp-public",
+            "redirect_uri": "http://localhost:8080/cb",
+            "response_type": "code",
+            "code_challenge": pkce_s256_challenge(v_def),
+            "code_challenge_method": "S256",
+            "state": "def-state",
+        },
+    )
+    code_def = dict(
+        urllib.parse.parse_qsl(urllib.parse.urlsplit(c_def["headers"]["location"]).query)
+    )["code"]
+
+    # Finding 9: Omitting redirect_uri on authorization_code exchange fails when set at authorize
+    no_redir_tok = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": "authorization_code",
+                "client_id": "dtc-mcp-public",
+                "code": code_def,
+                "code_verifier": v_def,
+            },
+        )
+    )
+    assert no_redir_tok["statusCode"] == 400
+
+    # Finding 4: Auth-code reuse / wrong verifier fails
+    c_def2 = _complete_login_and_consent(
+        server,
+        {
+            "client_id": "dtc-mcp-public",
+            "redirect_uri": "http://localhost:8080/cb",
+            "response_type": "code",
+            "code_challenge": pkce_s256_challenge(v_def),
+            "code_challenge_method": "S256",
+            "state": "def-state-2",
+        },
+    )
+    code_def2 = dict(
+        urllib.parse.parse_qsl(urllib.parse.urlsplit(c_def2["headers"]["location"]).query)
+    )["code"]
+    tok_ok = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": "authorization_code",
+                "client_id": "dtc-mcp-public",
+                "code": code_def2,
+                "redirect_uri": "http://localhost:8080/cb",
+                "code_verifier": v_def,
+            },
+        )
+    )
+    assert tok_ok["statusCode"] == 200
+    tok_ok_doc = json.loads(tok_ok["body"])
+    claims_def = verify_access_token(
+        tok_ok_doc["access_token"],
+        expected_issuer="https://oauth.dtcdev.click",
+        expected_audience=RESOURCE_HUB_MCP,
+        jwks=server.jwks_document(),
+        now=clock(),
+    )
+    assert claims_def["aud"] == RESOURCE_HUB_MCP
+    assert claims_def["scope"] == DEFAULT_HUMAN_SCOPE
+
+    # Double exchange of consumed code_def2 fails
+    tok_reuse = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": "authorization_code",
+                "client_id": "dtc-mcp-public",
+                "code": code_def2,
+                "redirect_uri": "http://localhost:8080/cb",
+                "code_verifier": v_def,
+            },
+        )
+    )
+    assert tok_reuse["statusCode"] == 400
+
+    # Finding 3: Deny consent returns error=access_denied, state, and iss; evil redirect rejected
+    evil_redir = server.dispatch(
+        _make_event(
+            "GET",
+            "/oauth/authorize",
+            query={
+                "client_id": "dtc-mcp-public",
+                "redirect_uri": "https://evil.example.com/cb",
+                "response_type": "code",
+                "code_challenge": pkce_s256_challenge(v_def),
+                "code_challenge_method": "S256",
+            },
+        )
+    )
+    assert evil_redir["statusCode"] == 400
+
+    c_deny = _complete_login_and_consent(
+        server,
+        {
+            "client_id": "dtc-mcp-public",
+            "redirect_uri": "http://localhost:8080/cb",
+            "response_type": "code",
+            "code_challenge": pkce_s256_challenge(v_def),
+            "code_challenge_method": "S256",
+            "state": "deny-state-1",
+        },
+        decision="deny",
+    )
+    assert c_deny["statusCode"] == 303
+    deny_qs = dict(
+        urllib.parse.parse_qsl(urllib.parse.urlsplit(c_deny["headers"]["location"]).query)
+    )
+    assert deny_qs["error"] == "access_denied"
+    assert deny_qs["state"] == "deny-state-1"
+    assert deny_qs["iss"] == "https://oauth.dtcdev.click"
+
+    # Finding 5 & 7: Refresh token revocation & unauthenticated forged JWT revocation blocked
+    forged_jwt = (
+        b64url_encode(b'{"alg":"RS256","kid":"fake"}')
+        + "."
+        + b64url_encode(b'{"jti":"forged-jti-1","iss":"https://oauth.dtcdev.click","exp":9999999999}')
+        + "."
+        + b64url_encode(b"bad-sig")
+    )
+    server.dispatch(_make_event("POST", "/oauth/revoke", body={"token": forged_jwt}))
+    assert store.get("REVOKED_JTI#forged-jti-1") is None
+
+    rev_ref = server.dispatch(
+        _make_event("POST", "/oauth/revoke", body={"token": tok_ok_doc["refresh_token"]})
+    )
+    assert rev_ref["statusCode"] == 200
+    use_revoked_ref = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": "refresh_token",
+                "client_id": "dtc-mcp-public",
+                "refresh_token": tok_ok_doc["refresh_token"],
+            },
+        )
+    )
+    assert use_revoked_ref["statusCode"] == 400
+
+    # Finding 6 & 8: Device flow deny, expired_token, and client_id mismatch
+    dev_start = json.loads(
+        server.dispatch(
+            _make_event("POST", "/oauth/device", body={"client_id": "dtc-cli"})
+        )["body"]
+    )
+    mismatch_poll = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": DEVICE_GRANT_TYPE,
+                "device_code": dev_start["device_code"],
+                "client_id": "other-client",
+            },
+        )
+    )
+    assert mismatch_poll["statusCode"] == 400
+    assert json.loads(mismatch_poll["body"])["error"] == "invalid_grant"
+
+    clock.advance(601)
+    expired_poll = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": DEVICE_GRANT_TYPE,
+                "device_code": dev_start["device_code"],
+                "client_id": "dtc-cli",
+            },
+        )
+    )
+    assert json.loads(expired_poll["body"])["error"] == "expired_token"
+
+    # Finding 11 & 12: client_secret_post positive test & mixed DCR client_credentials rejected
+    cc_post = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/token",
+            body={
+                "grant_type": "client_credentials",
+                "client_id": "mcp-auth-test-service",
+                "client_secret": "dtcsvc_test_secret_123",
+            },
+        )
+    )
+    assert cc_post["statusCode"] == 200
+
+    mixed_dcr = server.dispatch(
+        _make_event(
+            "POST",
+            "/oauth/register",
+            body={
+                "redirect_uris": ["http://localhost:8080/cb"],
+                "grant_types": ["authorization_code", "client_credentials"],
+            },
+        )
+    )
+    assert mixed_dcr["statusCode"] == 400
+

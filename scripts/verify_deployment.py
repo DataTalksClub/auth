@@ -138,8 +138,8 @@ def verify_live():
             "StackResources"
         ]
     }
-    if "McpOAuthFunction" in stack_resources:
-        verify_oauth_issuer_live(region, opener)
+    assert "McpOAuthFunction" in stack_resources, "McpOAuthFunction missing in dtcdev-shared-auth"
+    verify_oauth_issuer_live(region, opener)
 
 
 def verify_oauth_issuer_live(region, opener):
