@@ -46,7 +46,7 @@ jobs:
       - name: Package policy Lambda
         run: |
           zip -j domain-guard.zip src/index.py
-          zip -j mcp-oauth.zip src/oauth_server.py src/index.py
+          zip -j mcp-oauth.zip src/oauth_server.py src/index.py src/dataops_secrets.py
       - name: Deploy policy Lambda
         run: |
           function_name=$(aws cloudformation describe-stack-resource \
