@@ -66,6 +66,11 @@ jobs:
             --query "StackResources[?LogicalResourceId=='McpOAuthFunction'].PhysicalResourceId | [0]" \
             --output text)
           if [ -n "$oauth_fn" ] && [ "$oauth_fn" != "None" ]; then
+            # Infrastructure must establish the store identity before this artifact runs.
+            store_table=$(aws lambda get-function-configuration \
+              --function-name "$oauth_fn" \
+              --query 'Environment.Variables.SECRETS_TABLE_NAME' --output text)
+            test "$store_table" = "$SECRETS_TABLE_NAME"
             aws lambda update-function-code \
               --function-name "$oauth_fn" \
               --zip-file fileb://mcp-oauth.zip >/dev/null
