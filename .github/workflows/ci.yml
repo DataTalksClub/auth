@@ -15,6 +15,9 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
+  SECRETS_REGION: eu-west-1
+  SECRETS_TABLE_NAME: dataops-v1-secrets
+  SECRETS_KEY_ID: arn:aws:kms:eu-west-1:817685572750:key/420b802e-1d2c-4a51-95e7-f798381303bb
   STACK_NAME: dtcdev-shared-auth
   DEPLOY_ROLE_ARN: arn:aws:iam::817685572750:role/shared-auth-github-actions-deploy
 
@@ -67,7 +70,6 @@ jobs:
               --function-name "$oauth_fn" \
               --zip-file fileb://mcp-oauth.zip >/dev/null
             aws lambda wait function-updated --function-name "$oauth_fn"
-            uv run --with boto3 python scripts/provision_service_clients.py --region "$AWS_REGION"
           fi
       - name: Verify live deployment
         run: uv run --with boto3 python scripts/verify_deployment.py --live
