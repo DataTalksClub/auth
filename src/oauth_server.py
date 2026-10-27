@@ -2050,23 +2050,15 @@ def _build_default_server() -> OAuthServer:
     region = os.environ.get("AWS_REGION", "us-east-1")
     ddb = boto3.resource("dynamodb", region_name=region)
     kms = boto3.client("kms", region_name=region)
-    sm = boto3.client("secretsmanager", region_name=region)
+    from dataops_secrets import reader_from_env
 
     table_name = os.environ["OAUTH_TABLE_NAME"]
     signing_key_id = os.environ["SIGNING_KEY_ID"]
-    session_secret_arn = os.environ["SESSION_SECRET_ARN"]
-    service_clients_secret_arn = os.environ.get("SERVICE_CLIENTS_SECRET_ARN", "")
-
-    session_secret = sm.get_secret_value(SecretId=session_secret_arn)["SecretString"]
-    service_clients: dict[str, dict[str, Any]] = {}
-    if service_clients_secret_arn:
-        try:
-            raw_svc = sm.get_secret_value(SecretId=service_clients_secret_arn)["SecretString"]
-            parsed = json.loads(raw_svc)
-            if isinstance(parsed, dict):
-                service_clients = parsed
-        except Exception:
-            service_clients = {}
+    reader = reader_from_env()
+    session_secret = reader.read(os.environ["SESSION_SECRET_NAME"])["value"]
+    service_clients = json.loads(reader.read(os.environ["SERVICE_CLIENTS_SECRET_NAME"])["value"])
+    if not isinstance(service_clients, dict):
+        raise ValueError("Service clients secret must contain a JSON object")
 
     return OAuthServer(
         issuer_url=os.environ.get("ISSUER_URL", "https://oauth.dtcdev.click"),

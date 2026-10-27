@@ -229,11 +229,9 @@ def verify_oauth_issuer_live(region, opener):
         dev_doc = json.loads(resp.read().decode("utf-8"))
     assert dev_doc.get("device_code") and dev_doc.get("user_code")
 
-    # Service token via client_credentials (secret read from Secrets Manager, never printed)
-    sm = boto3.client("secretsmanager", region_name=region)
-    svc_map = json.loads(
-        sm.get_secret_value(SecretId="dtcdev-shared-auth/service-clients")["SecretString"]
-    )
+    from src.dataops_secrets import reader_from_env
+
+    svc_map = json.loads(reader_from_env().read("dtcdev-shared-auth.service-clients")["value"])
     test_svc = svc_map["mcp-auth-test-service"]
     tok_req = urllib.request.Request(
         f"{issuer}/oauth/token",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Idempotently provision confidential service clients in Secrets Manager and DynamoDB.
+"""Idempotently provision confidential service clients in DataOps and DynamoDB.
 
 Never prints client secrets. Fails closed outside AWS sandbox account 817685572750.
 """
@@ -10,10 +10,11 @@ import argparse
 import hashlib
 import json
 import secrets
+import subprocess
 from typing import Any
 
 SANDBOX_ACCOUNT_ID = "817685572750"
-DEFAULT_SECRET_NAME = "dtcdev-shared-auth/service-clients"
+DEFAULT_SECRET_NAME = "dtcdev-shared-auth.service-clients"
 DEFAULT_TABLE_NAME = "dtcdev-shared-auth-oauth"
 
 SERVICE_CLIENT_CATALOG: dict[str, dict[str, Any]] = {
@@ -64,7 +65,7 @@ def build_updated_service_clients(
     existing_map: dict[str, Any],
     catalog: dict[str, dict[str, Any]] = SERVICE_CLIENT_CATALOG,
 ) -> tuple[dict[str, dict[str, Any]], bool]:
-    """Merge catalog with existing Secrets Manager entries, preserving existing secrets."""
+    """Merge catalog with existing DataOps entries, preserving existing secrets."""
     updated: dict[str, dict[str, Any]] = {}
     changed = False
     for client_id, spec in catalog.items():
@@ -102,22 +103,28 @@ def provision_live(region: str, secret_id: str, table_name: str) -> None:
     account = boto3.client("sts", region_name=region).get_caller_identity()["Account"]
     assert account == SANDBOX_ACCOUNT_ID, f"Refusing to run outside {SANDBOX_ACCOUNT_ID}"
 
-    sm = boto3.client("secretsmanager", region_name=region)
     ddb = boto3.resource("dynamodb", region_name=region)
     table = ddb.Table(table_name)
 
-    existing_map: dict[str, Any] = {}
-    try:
-        raw = sm.get_secret_value(SecretId=secret_id).get("SecretString") or "{}"
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict):
-            existing_map = parsed
-    except Exception:
-        existing_map = {}
-
+    # Capture admin CLI output so errors never echo values.
+    result = subprocess.run(
+        ["dataops", "secrets", "get", secret_id, "--field", "value"],
+        capture_output=True, check=False,
+    )
+    if result.returncode:
+        raise RuntimeError("DataOps admin secret read failed")
+    existing_map = json.loads(result.stdout)
+    if not isinstance(existing_map, dict):
+        raise ValueError("Service clients secret must contain a JSON object")
     updated_map, changed = build_updated_service_clients(existing_map)
     if changed:
-        sm.put_secret_value(SecretId=secret_id, SecretString=json.dumps(updated_map))
+        result = subprocess.run(
+            ["dataops", "secrets", "set", secret_id, "--from-file", "-"],
+            input=json.dumps({"value": json.dumps(updated_map)}).encode(),
+            capture_output=True, check=False,
+        )
+        if result.returncode:
+            raise RuntimeError("DataOps admin secret write failed")
 
     # Sync hash-only records to DynamoDB (never store plaintext secret in DynamoDB)
     for client_id, entry in updated_map.items():
