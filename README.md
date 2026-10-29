@@ -39,8 +39,16 @@ every app uses it. The default routes are `POST /api/auth/device` and
 
 ## Development
 
+Before pushing, run the local lint and test gate:
+
 ```bash
-uv run --with pytest python -m pytest
+make check
+make test-node
+```
+
+To verify a deployment with authorized AWS credentials:
+
+```bash
 uv run --with boto3 python scripts/verify_deployment.py --live
 ```
 
