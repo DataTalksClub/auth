@@ -27,6 +27,7 @@ def test_client_registry_is_complete_and_unique():
         "gym",
         "dapier-cli",
         "agent-hub",
+        "tools",
     }
     assert len({client["client_id"] for client in clients}) == len(clients)
     seen = []

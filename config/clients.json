@@ -63,6 +63,12 @@
         "http://localhost:19130/",
         "https://hub.dtcdev.click/"
       ]
+    },
+    {
+      "name": "tools",
+      "client_id": "3ljs69686kpef3tuv5cje9q487",
+      "callback_url": "https://tools.dtcdev.click/auth/callback",
+      "logout_url": "https://tools.dtcdev.click/"
     }
   ]
 }
